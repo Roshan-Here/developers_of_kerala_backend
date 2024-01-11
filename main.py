@@ -4,10 +4,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pymongo.errors import ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from bson.objectid import ObjectId
+from typing import List, Optional
+
+from fastapi import Depends, HTTPException
 
 from typing import Optional
 from dotenv import load_dotenv
-from models import DeveloperProfileUpdate, CompanyProfileUpdate
+from models import DeveloperProfileUpdate, CompanyProfileUpdate,Opening,OpeningStatus
 
 from database import db
 from models import UserRegistration, Opening, OpeningStatus
@@ -327,6 +330,126 @@ async def retrieve_company_list():
                 "data": company_list,
             },
         )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": str(e),
+            },
+        )
+
+
+@app.post("/insert_job", response_model=Opening)
+async def insert_job(
+    job_role: str,
+    skills_needed : List[str],
+    qualification_required: str,
+    job_description: str,
+    no_of_openings: int = 1,
+    status: str = "active"
+):
+    """
+    Insert a new job opening into the MongoDB collection.
+
+    Args:
+        opening (Opening): Details of the job opening.
+
+    Returns:
+        Opening: Details of the inserted job opening.
+    """
+    try:
+        opening = Opening(
+            job_role=job_role,
+            skills_needed=skills_needed,
+            qualification_required=qualification_required,
+            job_description=job_description,
+            no_of_openings=no_of_openings,
+            status=status
+        )
+        # Insert the job opening into the MongoDB collection
+        result = db.openings.insert_one(opening.dict())
+
+        # Get the inserted document's ID
+        inserted_id = result.inserted_id
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "status": "success",
+                "inserted_id": str(inserted_id)
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": str(e),
+            },
+        )
+
+# needs atlease one paramter in search
+def at_least_one_required(
+    skills_needed: str = None,
+    qualification_required: str = None,
+    job_role: str = None,
+    job_description: str = None,
+):
+    print('skills needed:',skills_needed)
+    # Check if at least one field is provided
+    if not any([skills_needed, qualification_required, job_role, job_description]):
+        raise HTTPException(status_code=422, detail="At least one field is required")
+    
+     # Ensure skills_needed is not an empty list
+    if skills_needed is not None and not skills_needed:
+        raise HTTPException(status_code=422, detail="Skills_needed should not be an empty list")
+
+    # Return the provided values
+    return skills_needed, qualification_required, job_role, job_description
+
+
+
+@app.get("/job_search", response_model=List[Opening])
+# using Depends to check if atleast one parameter is present
+async def job_search(
+    params: tuple = Depends(at_least_one_required)
+):
+    """
+    Search for job openings based on specified criteria.
+
+    Args:
+        skills_needed (List[str]): List of required skills.
+        qualification_required (str): Required qualification.
+        job_role (str): Desired job role.
+        status (OpeningStatus): Status of the job openings (default is 'active').
+
+    Returns:
+        List[Opening]: List of job openings matching the specified criteria.
+    """
+    # Unpack the tuple
+    skills_needed, qualification_required, job_role, job_description = params
+    print('skills needed:',skills_needed)
+    if skills_needed:
+        skills_needed = skills_needed.split(",")
+    try:
+        # MongoDB query to fetch job openings
+        query = {
+            # "skills_needed": skills_needed,
+            # "skills_needed": {"$in": skills_needed} if skills_needed else None,
+            "qualification_required": qualification_required,
+            "job_role": job_role,
+            "job_description": job_description,
+            # "status": "active",
+        }
+
+        print("query",query)
+        job_openings_list = []
+        # Fetch job openings from the database based on the provided criteria
+        for opening in db.openings.find():
+            print(opening)
+            job_openings_list.append(opening)
+        return job_openings_list
     except Exception as e:
         raise HTTPException(
             status_code=500,
