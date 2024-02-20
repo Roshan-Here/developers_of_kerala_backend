@@ -6,10 +6,13 @@ from app.core.security import (
     create_access_token,
     blacklist_token,
     verify_refresh_token,
+    create_access_token,
+    generate_refresh_token,
 )
 from app.api.deps import oauth2_scheme
 from app.db.engine import db
-
+from bson import ObjectId
+from jose import JWTError
 
 router = APIRouter()
 token_router = APIRouter()
@@ -65,10 +68,14 @@ async def register_user(
     print("role----", role)
     if role not in ["company", "developer"]:
         raise HTTPException(status_code=422, detail="Invalid role")
-    existing_user = db.UserRegistration.find_one(
+    existing_company_user = db.Company.find_one(
+    {"$or": [{"username": username}, {"email": email}]}
+    )
+    existing_developer_user = db.Developers.find_one(
         {"$or": [{"username": username}, {"email": email}]}
     )
-    if existing_user:
+
+    if existing_company_user or existing_developer_user:
         raise HTTPException(status_code=400, detail="Username or email already exists")
     user_dict = {
         "username": username,
@@ -77,7 +84,13 @@ async def register_user(
         "role": role,
     }
     user_dict["password"] = pwd_context.hash(user_dict["password"])
-    result = db.UserRegistration.insert_one(user_dict)
+
+    # Choose the collection based on the role
+    if role == "company":
+        result = db.Company.insert_one(user_dict)
+    elif role == "developer":
+        result = db.Developers.insert_one(user_dict)
+
     if result.acknowledged:
         return JSONResponse(
             status_code=200,
@@ -128,9 +141,14 @@ async def login(username: str = Form(...), password: str = Form(...)) -> JSONRes
     Raises:
         HTTPException: If the provided credentials are invalid.
     """
-    user = db.UserRegistration.find_one(
+    user_in_company = db.Company.find_one(
+    {"$or": [{"username": username}, {"email": username}]}
+    )
+    user_in_developers = db.Developers.find_one(
         {"$or": [{"username": username}, {"email": username}]}
     )
+
+    user = user_in_company or user_in_developers
     if user and pwd_context.verify(password, user["password"]):
         token_data = {
             "sub": str(user["_id"]),
@@ -138,9 +156,11 @@ async def login(username: str = Form(...), password: str = Form(...)) -> JSONRes
             "role": user.get("role"),
         }
         token = create_access_token(token_data)
+        refresh_token = generate_refresh_token(token_data)
         return JSONResponse(
             {
                 "access_token": token,
+                "refresh_token": refresh_token,
                 "token_type": "bearer",
                 "role": user.get("role"),
                 "username": user["username"],
@@ -150,17 +170,20 @@ async def login(username: str = Form(...), password: str = Form(...)) -> JSONRes
 
 
 @router.get("/logout", response_model=None)
-async def logout(token: str = Depends(oauth2_scheme)):
-    """
-    Log out a user.
-    Invalidate the user's access token.
-
-    Returns:
-        JSONResponse: A JSON response indicating that the user has been logged out.
-
-    TODO: Implement logout logic.
-    """
-    blacklist_token(token)
+async def logout(token: str = Depends(oauth2_scheme),refresh_token: str = Form(...))-> JSONResponse:
+    try:
+        blacklist_token(refresh_token)
+        blacklist_token(token)
+    except JWTError as e:
+        if 'Signature has expired' in str(e):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error",
+                    "message": "Token has expired",
+                },
+            )
+        raise
     return JSONResponse(
         status_code=200,
         content={
@@ -173,6 +196,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
 @token_router.post(
     "/refresh-token",
     response_model=None,
+    
     responses={
         200: {
             "description": "Successful Token Refresh",
@@ -188,7 +212,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
             },
         },
         401: {
-            "description": "Invalid Refresh Token",
+            "description": "Unauthorized",
             "content": {
                 "application/json": {"example": {"detail": "Invalid refresh token"}}
             },
@@ -197,7 +221,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
 )
 async def refresh_token(
     refresh_token: str = Form(...),
-) -> JSONResponse:
+access_token: str = Depends(oauth2_scheme),) -> JSONResponse:
     """
     Refresh the access token using a refresh token.
 
@@ -210,22 +234,29 @@ async def refresh_token(
     Raises:
         HTTPException: If the provided refresh token is invalid.
     """
-    user_id = verify_refresh_token(refresh_token)
-    if user_id:
-        user = db.UserRegistration.find_one({"_id": user_id})
-        if user:
-            token_data = {
-                "sub": str(user["_id"]),
-                "username": user["username"],
-                "role": user.get("role", ""),
-            }
-            new_access_token = create_access_token(token_data)
-            return JSONResponse(
-                {
-                    "access_token": new_access_token,
-                    "token_type": "bearer",
-                    "role": user.get("role", ""),
+    try:
+        user_id = verify_refresh_token(refresh_token)
+        if user_id:
+            user_in_company = db.Company.find_one({"_id": ObjectId(user_id)})
+            user_in_developers = db.Developers.find_one({"_id": ObjectId(user_id)})
+
+            user = user_in_company or user_in_developers
+            if user:
+                blacklist_token(access_token)
+                token_data = {
+                    "sub": str(user["_id"]),
                     "username": user["username"],
+                    "role": user.get("role"),
                 }
-            )
-    raise HTTPException(status_code=401, detail="Invalid refresh token")
+                new_access_token = create_access_token(token_data)
+                return JSONResponse(
+                    {
+                        "access_token": new_access_token,
+                        "token_type": "bearer",
+                        "role": user.get("role", ""),
+                        "username": user["username"],
+                    }
+                )
+
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"{e}")
