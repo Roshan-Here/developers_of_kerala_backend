@@ -37,7 +37,7 @@ async def retrieve_developer_list():
     """
     try:
         # Fetch all developers from the collection
-        developers = db.UserRegistration.find({"role": "developer"}, {"password": 0})
+        developers = db.Developers.find({"role": "developer"}, {"password": 0})
         developer_list = [
             {**developer, "_id": str(developer["_id"])} for developer in developers
         ]
@@ -90,7 +90,7 @@ async def search_developers(
         # Create a dynamic query to find companies based on the provided field and value
         search_query = {"role": "developer", field: {"$regex": value, "$options": "i"}}
         print("search_query:", search_query)
-        developers = db.UserRegistration.find(search_query, {"password": 0})
+        developers = db.Developers.find(search_query, {"password": 0})
         # Convert ObjectId to string for each company in the result
         developer_list = [
             {**developer, "_id": str(developer["_id"])} for developer in developers
@@ -137,9 +137,9 @@ async def create_developer(developer: UpdateDeveloperModel):
     """
     try:
         # Assuming db is your MongoDB connection object
-        # and UserRegistration is your MongoDB collection for developers
-        result = db.UserRegistration.insert_one(developer.dict(by_alias=True))
-        created_developer = db.UserRegistration.find_one({"_id": result.inserted_id})
+        # and Developers is your MongoDB collection for developers
+        result = db.Developers.insert_one(developer.dict(by_alias=True))
+        created_developer = db.Developers.find_one({"_id": result.inserted_id})
 
         if created_developer:
             created_developer["_id"] = str(
@@ -186,7 +186,7 @@ async def get_developer(id: str):
     except Exception:
         raise HTTPException(status_code=404, detail=f"Invalid ObjectId: {id}")
 
-    if (developer := db.UserRegistration.find_one({"_id": object_id})) is not None:
+    if (developer := db.Developers.find_one({"_id": object_id})) is not None:
         developer["_id"] = str(developer["_id"])  # Convert ObjectId to string
         return developer
 
@@ -219,7 +219,7 @@ async def update_developer(id: str, developer: UpdateDeveloperModel = Body(...))
     developer_dict = developer.dict(by_alias=True)
     developer_updates = {k: v for k, v in developer_dict.items() if v is not None}
     if developer_updates:
-        updated_developer = db.UserRegistration.find_one_and_update(
+        updated_developer = db.Developers.find_one_and_update(
             {"_id": ObjectId(id)},
             {"$set": developer_updates},
             return_document=ReturnDocument.AFTER,
@@ -233,7 +233,7 @@ async def update_developer(id: str, developer: UpdateDeveloperModel = Body(...))
             return updated_developer
 
     # The update is empty, but we should still return the matching document:
-    if (developer := db.UserRegistration.find_one({"_id": ObjectId(id)})) is not None:
+    if (developer := db.Developers.find_one({"_id": ObjectId(id)})) is not None:
         developer["_id"] = str(developer["_id"])  # Convert ObjectId to string
         return developer
 
@@ -258,7 +258,7 @@ async def update_developer(id: str, developer: UpdateDeveloperModel = Body(...))
 #             developer_object_id = ObjectId(developer_id)
 #         except Exception:
 #             raise HTTPException(status_code=404, detail=f"Invalid ObjectId: {id}")
-#         deleted_developer = db.UserRegistration.find_one_and_delete({"_id": developer_object_id})
+#         deleted_developer = db.Developers.find_one_and_delete({"_id": developer_object_id})
 #         if deleted_developer:
 #             deleted_developer["_id"] = str(deleted_developer["_id"])
 #             return {"message": "Developer account deleted successfully", "job": deleted_developer}

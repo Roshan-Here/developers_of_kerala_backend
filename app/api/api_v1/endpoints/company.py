@@ -40,7 +40,7 @@ async def retrieve_company_list():
     """
     try:
         # Fetch all companies from the collection
-        companies = db.UserRegistration.find({"role": "company"}, {"password": 0})
+        companies = db.Company.find({"role": "company"}, {"password": 0})
         company_list = [
             {**company, "_id": str(company["_id"])} for company in companies
         ]
@@ -93,7 +93,7 @@ async def search_companies(
     try:
         # Create a dynamic query to find companies based on the provided field and value
         search_query = {"role": "company", field: {"$regex": value, "$options": "i"}}
-        companies = db.UserRegistration.find(search_query, {"password": 0})
+        companies = db.Company.find(search_query, {"password": 0})
         print("companies-----", companies)
 
         # Convert ObjectId to string for each company in the result
@@ -140,10 +140,8 @@ async def create_company(company: UpdateCompanyProfileModel):
     - HTTPException: If there is an issue creating the Company profile.
     """
     try:
-        # Assuming db is your MongoDB connection object
-        # and UserRegistration is your MongoDB collection for developers
-        result = db.UserRegistration.insert_one(company.dict(by_alias=True))
-        created_company = db.UserRegistration.find_one({"_id": result.inserted_id})
+        result = db.Company.insert_one(company.dict(by_alias=True))
+        created_company = db.Company.find_one({"_id": result.inserted_id})
 
         if created_company:
             created_company["_id"] = str(
@@ -185,7 +183,7 @@ async def get_company(id: str):
     Raises:
     - HTTPException: If the company with the specified ID is not found.
     """
-    if (company := db.UserRegistration.find_one({"_id": ObjectId(id)})) is not None:
+    if (company := db.Company.find_one({"_id": ObjectId(id)})) is not None:
         company["_id"] = str(company["_id"])  # Convert ObjectId to string
         return company
 
@@ -218,7 +216,7 @@ async def update_company(id: str, company: UpdateCompanyProfileModel = Body(...)
     company_dict = company.dict(by_alias=True)
     company_updates = {k: v for k, v in company_dict.items() if v is not None}
     if company_updates:
-        updated_company = db.UserRegistration.find_one_and_update(
+        updated_company = db.Company.find_one_and_update(
             {"_id": ObjectId(id)},
             {"$set": company_updates},
             return_document=ReturnDocument.AFTER,
@@ -232,7 +230,7 @@ async def update_company(id: str, company: UpdateCompanyProfileModel = Body(...)
             return updated_company
 
     # The update is empty, but we should still return the matching document:
-    if (company := db.UserRegistration.find_one({"_id": ObjectId(id)})) is not None:
+    if (company := db.Company.find_one({"_id": ObjectId(id)})) is not None:
         company["_id"] = str(company["_id"])  # Convert ObjectId to string
         return company
 
