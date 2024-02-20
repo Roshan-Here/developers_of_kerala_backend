@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 
-from jose import jwt , JWTError , ExpiredSignatureError
+from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi import HTTPException
 from passlib.context import CryptContext
 
@@ -44,6 +44,7 @@ def verify_refresh_token(refresh_token: str):
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
+
 def generate_refresh_token(data: dict):
     """
     Generate a refresh token for a user.
@@ -58,14 +59,17 @@ def generate_refresh_token(data: dict):
     # Set the expiration time for the token (e.g., 7 days from now)
     refresh_exp_time = datetime.utcnow() + timedelta(days=7)
 
-    data.update({
-        "exp": refresh_exp_time,
-    })
+    data.update(
+        {
+            "exp": refresh_exp_time,
+        }
+    )
     to_encode = data.copy()
     # Generate the token using the secret key
     refresh_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
     return refresh_token
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -82,7 +86,6 @@ def delete_blacklisted_tokens():
 
 def blacklist_token(token: str, background_tasks: BackgroundTasks = None):
     try:
-       
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         expire = payload.get("exp")
         db.blocklist.insert_one({"token": token, "expire": expire})
@@ -91,4 +94,3 @@ def blacklist_token(token: str, background_tasks: BackgroundTasks = None):
             background_tasks.add_task(delete_blacklisted_tokens)
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"{e}")
-        

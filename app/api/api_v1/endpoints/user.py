@@ -69,7 +69,7 @@ async def register_user(
     if role not in ["company", "developer"]:
         raise HTTPException(status_code=422, detail="Invalid role")
     existing_company_user = db.Company.find_one(
-    {"$or": [{"username": username}, {"email": email}]}
+        {"$or": [{"username": username}, {"email": email}]}
     )
     existing_developer_user = db.Developers.find_one(
         {"$or": [{"username": username}, {"email": email}]}
@@ -142,7 +142,7 @@ async def login(username: str = Form(...), password: str = Form(...)) -> JSONRes
         HTTPException: If the provided credentials are invalid.
     """
     user_in_company = db.Company.find_one(
-    {"$or": [{"username": username}, {"email": username}]}
+        {"$or": [{"username": username}, {"email": username}]}
     )
     user_in_developers = db.Developers.find_one(
         {"$or": [{"username": username}, {"email": username}]}
@@ -170,12 +170,14 @@ async def login(username: str = Form(...), password: str = Form(...)) -> JSONRes
 
 
 @router.get("/logout", response_model=None)
-async def logout(token: str = Depends(oauth2_scheme),refresh_token: str = Form(...))-> JSONResponse:
+async def logout(
+    token: str = Depends(oauth2_scheme), refresh_token: str = Form(...)
+) -> JSONResponse:
     try:
         blacklist_token(refresh_token)
         blacklist_token(token)
     except JWTError as e:
-        if 'Signature has expired' in str(e):
+        if "Signature has expired" in str(e):
             return JSONResponse(
                 status_code=401,
                 content={
@@ -196,7 +198,6 @@ async def logout(token: str = Depends(oauth2_scheme),refresh_token: str = Form(.
 @token_router.post(
     "/refresh-token",
     response_model=None,
-    
     responses={
         200: {
             "description": "Successful Token Refresh",
@@ -221,7 +222,8 @@ async def logout(token: str = Depends(oauth2_scheme),refresh_token: str = Form(.
 )
 async def refresh_token(
     refresh_token: str = Form(...),
-access_token: str = Depends(oauth2_scheme),) -> JSONResponse:
+    access_token: str = Depends(oauth2_scheme),
+) -> JSONResponse:
     """
     Refresh the access token using a refresh token.
 
