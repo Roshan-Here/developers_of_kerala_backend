@@ -9,8 +9,9 @@ from app.core.security import (
     create_access_token,
     generate_refresh_token,
 )
-from app.api.deps import oauth2_scheme
+from app.api.deps import oauth2_scheme , get_current_user
 from app.db.engine import db
+from app.schemas.user import ResetPasswordInput
 from bson import ObjectId
 from jose import JWTError
 
@@ -262,3 +263,42 @@ async def refresh_token(
 
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"{e}")
+
+
+@router.post("/reset-password")
+async def reset_password(
+    reset_password_input: ResetPasswordInput,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Reset the user's password.
+
+    Args:
+        reset_password_input (ResetPasswordInput): The current and new password.
+        current_user (dict): The current user.
+
+    Returns:
+        dict: A success message.
+
+    Raises:
+        HTTPException: If the current password is incorrect.
+    """
+    user_id = current_user["sub"]
+    user_in_company = db.Company.find_one({"_id": ObjectId(user_id)})
+    user_in_developers = db.Developers.find_one({"_id": ObjectId(user_id)})
+    user = user_in_company or user_in_developers
+
+    # Verify the current password
+    if not pwd_context.verify(reset_password_input.current_password, user["password"]):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+
+    # Hash the new password
+    new_password_hashed = pwd_context.hash(reset_password_input.new_password)
+
+    # Update the user's password in the database
+    if user_in_company:
+        db.Company.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}})
+    else:
+        db.Developers.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}})
+
+    return {"message": "Password has been reset successfully"}
