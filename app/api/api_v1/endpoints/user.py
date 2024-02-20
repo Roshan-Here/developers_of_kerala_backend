@@ -9,7 +9,7 @@ from app.core.security import (
     create_access_token,
     generate_refresh_token,
 )
-from app.api.deps import oauth2_scheme , get_current_user
+from app.api.deps import oauth2_scheme, get_current_user
 from app.db.engine import db
 from app.schemas.user import ResetPasswordInput
 from bson import ObjectId
@@ -297,8 +297,12 @@ async def reset_password(
 
     # Update the user's password in the database
     if user_in_company:
-        db.Company.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}})
+        db.Company.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}}
+        )
     else:
-        db.Developers.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}})
+        db.Developers.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"password": new_password_hashed}}
+        )
 
     return {"message": "Password has been reset successfully"}
