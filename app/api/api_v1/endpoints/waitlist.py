@@ -5,8 +5,8 @@ from app.api.deps import get_current_user
 router = APIRouter()
 
 
-@router.post("/submit")
-async def submit_waitlist_email(email: str = Form(...)):
+@router.post("/submit/{email}")
+async def submit_waitlist_email(email: str):
     print(f"Received waitlist email: {email}")
     try:
         result = db.waitlist.insert_one({"email": email})
