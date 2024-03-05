@@ -1,20 +1,33 @@
-version: "3"
+# version: "3"
 
-services:
-  app:
-    build:
-      context: .
-      args:
-        DEV: "true"
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-    volumes:
-      - ./app:/app/
+# services:
+#   app:
+#     build:
+#       context: .
+#       args:
+#         DEV: "true"
+#     ports:
+#       - "8080:8080"
+#     env_file:
+#       - .env
+#     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+#     volumes:
+#       - ./app:/app/
     # deploy:
     # resources:
     #   limits:
     #     cpus: '0.5'  # Set CPU limit to 50%
     #     memory: 512M  # Set memory limit to 512 MB
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    environment:
+      - POETRY_VERSION=1.7.1  # Specify the desired Poetry version
+
+# Add other services or configurations as needed
