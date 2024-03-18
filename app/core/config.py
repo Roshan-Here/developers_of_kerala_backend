@@ -6,7 +6,7 @@ This module contains the configuration settings for the application, including A
 """
 import os
 from dotenv import load_dotenv
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, ClassVar
 
 from pydantic import AnyHttpUrl, EmailStr, HttpUrl, PostgresDsn, validator
 from pydantic_settings import BaseSettings
@@ -41,7 +41,21 @@ class Settings(BaseSettings):
     # MongoDB
     MONGODB_URI: str = os.environ.get("MONGODB_URI")
     MONGODB_NAME: str = os.environ.get("MONGODB_NAME")
+        
+    # Media (local storage)
+    BASE_DIR :ClassVar[str] = os.path.abspath(os.path.dirname(__file__))
+    MEDIA_URI :ClassVar[str] = os.path.join(BASE_DIR,f"media")
+    # allowed formats
+    ALLOWED_IMAGE_FORMATS : List[str] = ["jpg", "jpeg", "png", "gif"]
 
+    # Digital Ocean Credentials 
+    digital_ocean_bucket_id : str = os.environ.get("DIGITAL_OCEAN_BUCKET_ID")
+    digital_ocean_bucket_secret : str = os.environ.get("DIGITAL_OCEAN_BUCKET_SECRET")
+    region_name : str = os.environ.get("REGION_NAME")
+    endpoint_url : str = os.environ.get("ENDPOINT_URL")
+    bucket_name : str = os.environ.get("BUCKET_NAME")
+    
+    
     class Config:
         case_sensitive = True
 
